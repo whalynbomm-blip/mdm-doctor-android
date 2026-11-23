@@ -51,23 +51,12 @@ private fun managementChecks(context: Context): List<Check> {
     val policyManager = context.getSystemService(Context.DEVICE_POLICY_SERVICE) as DevicePolicyManager
     val userManager = context.getSystemService(Context.USER_SERVICE) as UserManager
 
-    val deviceOwnerComponent = if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.Q) {
-        try { policyManager.deviceOwnerComponentOnAnyUser } catch (_: Exception) { null }
-    } else null
-    val deviceManaged = deviceOwnerComponent != null
-    val organizationOwnedProfile = if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.R) {
-        try { policyManager.isOrganizationOwnedDeviceWithManagedProfile } catch (_: Exception) { null }
-    } else null
-
+    val ownDeviceOwner = try { policyManager.isDeviceOwnerApp(context.packageName) } catch (_: Exception) { false }
+    val ownProfileOwner = try { policyManager.isProfileOwnerApp(context.packageName) } catch (_: Exception) { false }
     val managementSummary = when {
-        deviceManaged && organizationOwnedProfile == true ->
-            "Android reports a device-owner component and an organisation-owned managed profile"
-        deviceManaged ->
-            "Android reports a device-owner component: " + deviceOwnerComponent?.flattenToShortString()
-        organizationOwnedProfile == true ->
-            "Android reports an organisation-owned device with a managed profile"
-        else ->
-            "No device-owner component was returned by the public API; this does not rule out profile, OEM, finance-provider, or server-side management"
+        ownDeviceOwner -> "MDM Doctor itself is registered as device owner"
+        ownProfileOwner -> "MDM Doctor itself is registered as profile owner"
+        else -> "Android does not expose a general list of other device-owner apps to an ordinary app"
     }
 
     val restrictionLabels = listOf(
