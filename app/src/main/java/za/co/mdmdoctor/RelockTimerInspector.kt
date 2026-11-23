@@ -41,7 +41,7 @@ fun RelockTimerInspectorCard(context: Context) {
             modifier = Modifier.padding(16.dp),
             verticalArrangement = Arrangement.spacedBy(8.dp)
         ) {
-            Text("PHONE RELock DEADLINE", style = MaterialTheme.typography.titleMedium)
+            Text("PHONE RELOCK DEADLINE", style = MaterialTheme.typography.titleMedium)
             Text(
                 "Investigation of the phone's own enforced relock deadline — not a countdown created or stored by MDM Doctor.",
                 style = MaterialTheme.typography.bodySmall
