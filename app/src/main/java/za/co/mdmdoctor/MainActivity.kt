@@ -29,7 +29,7 @@ private fun settingList(context: Context, key: String): List<String> =
 
 private fun runChecks(context: Context): List<Check> {
     val accessibility = settingList(context, Settings.Secure.ENABLED_ACCESSIBILITY_SERVICES)
-    val notificationListeners = settingList(context, Settings.Secure.ENABLED_NOTIFICATION_LISTENERS)
+    val notificationListeners = settingList(context, "enabled_notification_listeners")
     val policyManager = context.getSystemService(Context.DEVICE_POLICY_SERVICE) as DevicePolicyManager
     val admins = try {
         policyManager.activeAdmins.orEmpty().map { it.packageName }
@@ -148,7 +148,7 @@ private fun MdmDoctorScreen(activity: MainActivity) {
 
                 HorizontalDivider()
                 Text("Open Android inspection screens", style = MaterialTheme.typography.titleMedium)
-                OutlinedButton(onClick = { openSettings(Settings.ACTION_DEVICE_ADMIN_SETTINGS) }, modifier = Modifier.fillMaxWidth()) {
+                OutlinedButton(onClick = { openSettings("android.settings.DEVICE_ADMIN_SETTINGS") }, modifier = Modifier.fillMaxWidth()) {
                     Text("Device admin settings")
                 }
                 OutlinedButton(onClick = { openSettings(Settings.ACTION_ACCESSIBILITY_SETTINGS) }, modifier = Modifier.fillMaxWidth()) {
