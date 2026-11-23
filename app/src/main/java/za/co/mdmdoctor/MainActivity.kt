@@ -107,6 +107,20 @@ private fun assessmentText(checks: List<Check>): String {
     }
 }
 
+private fun componentGuidance(context: Context): List<Pair<String, String>> {
+    val policyManager = context.getSystemService(Context.DEVICE_POLICY_SERVICE) as DevicePolicyManager
+    val adminPackages = try { policyManager.activeAdmins.orEmpty().map { it.packageName } } catch (_: Exception) { emptyList() }
+    val accessibilityPackages = settingList(context, Settings.Secure.ENABLED_ACCESSIBILITY_SERVICES).map { it.substringBefore('/') }
+    val listenerPackages = settingList(context, "enabled_notification_listeners").map { it.substringBefore('/') }
+    val detected = (adminPackages + accessibilityPackages + listenerPackages).distinct()
+    return detected.mapNotNull { packageName ->
+        when (packageName) {
+            "com.samsung.android.kgclient" -> packageName to "Samsung KG Client component. Its presence can indicate a Samsung device-management component is active in an Android role listed above. It does not prove that a finance lock is active, identify who enrolled the device, or show whether a restriction is currently being enforced."
+            else -> null
+        }
+    }
+}
+
 private fun reportText(context: Context, checks: List<Check>): String = buildString {
     val appVersion = try {
         context.packageManager.getPackageInfo(context.packageName, 0).versionName ?: "Unknown"
@@ -195,6 +209,22 @@ private fun MdmDoctorScreen(activity: MainActivity) {
                         Text("Diagnostic assessment", style = MaterialTheme.typography.titleSmall)
                         Text(assessmentText(checks), style = MaterialTheme.typography.bodySmall)
                         Text("This explains visible settings only; it is not a security rating or finance-lock detector.", style = MaterialTheme.typography.bodySmall)
+                    }
+                }
+
+                val componentNotes = componentGuidance(activity)
+                ElevatedCard(Modifier.fillMaxWidth()) {
+                    Column(Modifier.padding(16.dp), verticalArrangement = Arrangement.spacedBy(6.dp)) {
+                        Text("Component identification guide", style = MaterialTheme.typography.titleSmall)
+                        if (componentNotes.isEmpty()) {
+                            Text("No components with a built-in explanation were recognised in the visible administrator, accessibility, or notification-listener lists. Other components may still be present; this guide is not a complete inventory.", style = MaterialTheme.typography.bodySmall)
+                        } else {
+                            componentNotes.forEach { (packageName, explanation) ->
+                                Text(packageName, style = MaterialTheme.typography.labelLarge)
+                                Text(explanation, style = MaterialTheme.typography.bodySmall)
+                            }
+                        }
+                        Text("Only exact package identifiers with a cautious, built-in explanation are shown. An unrecognised package is not automatically harmful.", style = MaterialTheme.typography.bodySmall)
                     }
                 }
 
