@@ -1,10 +1,13 @@
 package za.co.mdmdoctor
 
 import android.app.admin.DevicePolicyManager
+import android.content.ClipData
+import android.content.ClipboardManager
 import android.content.Context
 import android.content.Intent
 import android.os.Build
 import android.os.Bundle
+import android.widget.Toast
 import android.provider.Settings
 import androidx.activity.ComponentActivity
 import androidx.activity.compose.setContent
@@ -51,6 +54,7 @@ private fun runChecks(context: Context): List<Check> {
 
 private fun reportText(context: Context, checks: List<Check>): String = buildString {
     appendLine("MDM DOCTOR - DEVICE DIAGNOSTIC REPORT")
+    appendLine("App version: ${BuildConfig.VERSION_NAME}")
     appendLine("Generated: ${DateFormat.getDateTimeInstance().format(Date())}")
     appendLine()
     checks.forEach {
@@ -73,6 +77,7 @@ class MainActivity : ComponentActivity() {
 @Composable
 private fun MdmDoctorScreen(activity: MainActivity) {
     var checks by remember { mutableStateOf(runChecks(activity)) }
+    var lastRunAt by remember { mutableStateOf(Date()) }
     var packageName by remember { mutableStateOf("com.payjoy") }
 
     fun openSettings(action: String, data: String? = null) {
@@ -95,9 +100,17 @@ private fun MdmDoctorScreen(activity: MainActivity) {
                 Text("Android device diagnostics", style = MaterialTheme.typography.titleMedium, color = MaterialTheme.colorScheme.primary)
                 Text("Read-only inspection. No device-management settings are changed.", style = MaterialTheme.typography.bodyMedium)
 
-                Button(onClick = { checks = runChecks(activity) }, modifier = Modifier.fillMaxWidth()) {
+                Button(onClick = { checks = runChecks(activity); lastRunAt = Date() }, modifier = Modifier.fillMaxWidth()) {
                     Text("Run diagnostics again")
                 }
+                OutlinedButton(
+                    onClick = {
+                        val clipboard = activity.getSystemService(Context.CLIPBOARD_SERVICE) as ClipboardManager
+                        clipboard.setPrimaryClip(ClipData.newPlainText("MDM Doctor diagnostic report", reportText(activity, checks)))
+                        Toast.makeText(activity, "Diagnostic report copied", Toast.LENGTH_SHORT).show()
+                    },
+                    modifier = Modifier.fillMaxWidth()
+                ) { Text("Copy diagnostic report") }
                 OutlinedButton(
                     onClick = {
                         val send = Intent(Intent.ACTION_SEND).apply {
@@ -154,7 +167,7 @@ private fun MdmDoctorScreen(activity: MainActivity) {
                 Text("If the package name is unknown, find the app under Android Settings > Apps. Opening its information page does not change its permissions or management status.", style = MaterialTheme.typography.bodySmall)
                 Text("Privacy: MDM Doctor does not upload diagnostic reports. You choose if and where to share them.", style = MaterialTheme.typography.bodySmall)
                 Text("MDM Doctor is an information tool, not an unlock or removal tool.", style = MaterialTheme.typography.labelSmall)
-                Text("Generated: ${DateFormat.getDateTimeInstance().format(Date())}", style = MaterialTheme.typography.labelSmall)
+                Text("Last checked: ${DateFormat.getDateTimeInstance().format(lastRunAt)}", style = MaterialTheme.typography.labelSmall)
             }
         }
     }
