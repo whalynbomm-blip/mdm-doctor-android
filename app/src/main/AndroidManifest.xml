@@ -2,6 +2,7 @@
     <uses-permission android:name="android.permission.ACCESS_NETWORK_STATE" />
     <queries>
         <package android:name="com.payjoy" />
+        <package android:name="com.samsung.android.kgclient" />
     </queries>
     <application android:allowBackup="false" android:label="MDM Doctor" android:theme="@android:style/Theme.Material.Light.NoActionBar">
         <activity android:name=".MainActivity" android:exported="true">
