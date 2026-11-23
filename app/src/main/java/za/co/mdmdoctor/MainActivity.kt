@@ -27,10 +27,15 @@ private fun settingList(context: Context, key: String): List<String> =
 private fun runChecks(context: Context): List<Check> {
     val accessibility = settingList(context, Settings.Secure.ENABLED_ACCESSIBILITY_SERVICES)
     val notificationListeners = settingList(context, Settings.Secure.ENABLED_NOTIFICATION_LISTENERS)
+    val policyManager = context.getSystemService(Context.DEVICE_POLICY_SERVICE) as DevicePolicyManager
     val admins = try {
-        val manager = context.getSystemService(Context.DEVICE_POLICY_SERVICE) as DevicePolicyManager
-        manager.activeAdmins.orEmpty().map { it.packageName }
+        policyManager.activeAdmins.orEmpty().map { it.packageName }
     } catch (_: Exception) { emptyList() }
+    val ownManagementRole = when {
+        policyManager.isDeviceOwnerApp(context.packageName) -> "MDM Doctor is registered as device owner"
+        policyManager.isProfileOwnerApp(context.packageName) -> "MDM Doctor is registered as profile owner"
+        else -> "MDM Doctor is not device/profile owner"
+    }
 
     return listOf(
         Check("Device", "${Build.MANUFACTURER} ${Build.MODEL}", "Manufacturer and model reported by Android."),
@@ -39,7 +44,7 @@ private fun runChecks(context: Context): List<Check> {
         Check("Active device-admin apps", "${admins.distinct().size} reported", if (admins.isEmpty()) "Android did not return any active device-admin components to this app." else admins.distinct().joinToString("\n")),
         Check("Enabled accessibility services", "${accessibility.size} reported", if (accessibility.isEmpty()) "No enabled services were listed in Android's secure settings." else accessibility.joinToString("\n")),
         Check("Notification-listener access", "${notificationListeners.size} reported", if (notificationListeners.isEmpty()) "No enabled notification listeners were listed." else notificationListeners.joinToString("\n")),
-        Check("MDM Doctor owner status", "Not a device owner", "This checks only whether MDM Doctor itself is registered as a device or profile owner. It cannot identify every other management or finance policy."),
+        Check("MDM Doctor management role", ownManagementRole, "This checks only MDM Doctor's own registration status. It does not identify every other management agent or finance policy."),
         Check("Knox / finance lock", "Not conclusively detectable", "Samsung Knox, finance-provider controls, and server-side lock policies may not be fully visible to an ordinary app. Contact the provider or device seller for authoritative release status.")
     )
 }
