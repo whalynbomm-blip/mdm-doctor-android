@@ -2,8 +2,6 @@ package za.co.mdmdoctor
 
 import android.app.admin.DevicePolicyManager
 import android.content.Context
-import android.net.ConnectivityManager
-import android.net.NetworkCapabilities
 import android.os.Build
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
@@ -12,102 +10,64 @@ import androidx.compose.foundation.layout.padding
 import androidx.compose.material3.Button
 import androidx.compose.material3.Card
 import androidx.compose.material3.MaterialTheme
-import androidx.compose.material3.OutlinedButton
 import androidx.compose.material3.Text
 import androidx.compose.runtime.*
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.unit.dp
-import java.text.DateFormat
-import java.util.Date
 
-private data class RelockInspection(
+private data class PhoneRelockInspection(
     val activeAdmins: List<String>,
-    val payJoyVisible: Boolean,
-    val kgClientVisible: Boolean,
-    val network: String,
-    val checkedAt: String
+    val device: String
 )
 
-private fun readRelockIndicators(context: Context): RelockInspection {
+private fun inspectPhoneRelock(context: Context): PhoneRelockInspection {
     val dpm = context.getSystemService(Context.DEVICE_POLICY_SERVICE) as DevicePolicyManager
     val admins = try {
         dpm.activeAdmins.orEmpty().map { it.packageName }.distinct().sorted()
-    } catch (_: Exception) { emptyList() }
-
-    fun packageVisible(name: String): Boolean = try {
-        @Suppress("DEPRECATION")
-        context.packageManager.getPackageInfo(name, 0)
-        true
-    } catch (_: Exception) { false }
-
-    val cm = context.getSystemService(Context.CONNECTIVITY_SERVICE) as ConnectivityManager
-    val caps = cm.activeNetwork?.let { cm.getNetworkCapabilities(it) }
-    val network = when {
-        caps?.hasTransport(NetworkCapabilities.TRANSPORT_WIFI) == true -> "Wi-Fi"
-        caps?.hasTransport(NetworkCapabilities.TRANSPORT_CELLULAR) == true -> "Mobile data"
-        caps?.hasTransport(NetworkCapabilities.TRANSPORT_ETHERNET) == true -> "Ethernet"
-        caps?.hasCapability(NetworkCapabilities.NET_CAPABILITY_INTERNET) == true -> "Other network"
-        else -> "No active internet network detected"
+    } catch (_: Exception) {
+        emptyList()
     }
-    return RelockInspection(
+    return PhoneRelockInspection(
         activeAdmins = admins,
-        payJoyVisible = packageVisible("com.payjoy"),
-        kgClientVisible = packageVisible("com.samsung.android.kgclient"),
-        network = network,
-        checkedAt = DateFormat.getDateTimeInstance().format(Date())
+        device = "${Build.MANUFACTURER} ${Build.MODEL}"
     )
 }
 
 @Composable
 fun RelockTimerInspectorCard(context: Context) {
-    var result by remember { mutableStateOf(readRelockIndicators(context)) }
+    var result by remember { mutableStateOf(inspectPhoneRelock(context)) }
     Card(modifier = Modifier.fillMaxWidth()) {
         Column(
             modifier = Modifier.padding(16.dp),
             verticalArrangement = Arrangement.spacedBy(8.dp)
         ) {
-            Text("RELOCK TIMER INVESTIGATION", style = MaterialTheme.typography.titleMedium)
+            Text("PHONE RELock DEADLINE", style = MaterialTheme.typography.titleMedium)
             Text(
-                "This module checks device-side indicators that an ordinary Android app is allowed to observe. It does not change or disable any lock policy.",
+                "Investigation of the phone's own enforced relock deadline — not a countdown created or stored by MDM Doctor.",
                 style = MaterialTheme.typography.bodySmall
             )
-            Text("Device: ${Build.MANUFACTURER} ${Build.MODEL}")
-            Text("PayJoy package com.payjoy visible: ${if (result.payJoyVisible) "Yes" else "No"}")
-            Text("Samsung KG Client package visible: ${if (result.kgClientVisible) "Yes" else "No"}")
+            Text("Device: ${result.device}")
             Text("Active Android device administrators:")
             if (result.activeAdmins.isEmpty()) {
-                Text("No active administrator components returned by Android's public API.")
+                Text("Android's public API did not return active administrator components.")
             } else {
                 result.activeAdmins.forEach { Text("• $it") }
             }
-            Text("Network at inspection: ${result.network}")
-            Text("Last inspection: ${result.checkedAt}")
-            Text("Applied relock timestamp: NOT ACCESSIBLE")
+            Text("Phone-enforced relock deadline: NOT EXPOSED TO THIS APP")
             Text(
-                "Knox Guard's appliedRelockTimestamp and PayJoy account/server state are not exposed to an ordinary third-party app. This app also cannot read RPMB, TrustZone secure memory, or Knox Guard private storage. A missing package/admin indicator does not prove that no lock policy exists.",
-                style = MaterialTheme.typography.bodySmall
-            )
-            Text("Authorised change / removal test", style = MaterialTheme.typography.titleSmall)
-            Text(
-                "A timestamp change or unlock must be issued by PayJoy or the authorised Knox Guard administrator after verifying the financing account. MDM Doctor cannot write the protected timer or send an administrator unlock command.",
+                "Android does not provide ordinary apps with a public interface to read or change a protected device-enforced relock timestamp. Changing the displayed date or time does not establish that the underlying deadline has changed. This inspector does not simulate a deadline or claim to edit the phone's timer.",
                 style = MaterialTheme.typography.bodySmall
             )
             Text(
-                "Test procedure: (1) ask the provider to confirm the currently applied relock timestamp; (2) request an authorised extension or unlock; (3) record the provider's confirmation and time; (4) rerun this inspection and note whether the device's visible behaviour changed. The inspection is observational and cannot independently verify the server-side timestamp.",
+                "A genuine deadline change requires an authorised control interface from the organisation or service that manages the device. If such an interface is exposed for this phone, it can be investigated and integrated; otherwise the protected deadline cannot be edited from this app.",
                 style = MaterialTheme.typography.bodySmall
             )
             Button(
-                onClick = { result = readRelockIndicators(context) },
+                onClick = { result = inspectPhoneRelock(context) },
                 modifier = Modifier.fillMaxWidth()
-            ) { Text("Refresh relock indicators") }
-            OutlinedButton(
-                onClick = {
-                    try {
-                        context.startActivity(android.content.Intent(android.provider.Settings.ACTION_SETTINGS).addFlags(android.content.Intent.FLAG_ACTIVITY_NEW_TASK))
-                    } catch (_: Exception) { }
-                },
-                modifier = Modifier.fillMaxWidth()
-            ) { Text("Review Android device administrators") }
+            ) {
+                Text("Refresh phone relock inspection")
+            }
         }
     }
 }
