@@ -51,24 +51,23 @@ private fun managementChecks(context: Context): List<Check> {
     val policyManager = context.getSystemService(Context.DEVICE_POLICY_SERVICE) as DevicePolicyManager
     val userManager = context.getSystemService(Context.USER_SERVICE) as UserManager
 
-    val deviceManaged = if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.S) {
-        try { policyManager.isDeviceManaged } catch (_: Exception) { null }
+    val deviceOwnerComponent = if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.Q) {
+        try { policyManager.deviceOwnerComponentOnAnyUser } catch (_: Exception) { null }
     } else null
+    val deviceManaged = deviceOwnerComponent != null
     val organizationOwnedProfile = if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.R) {
         try { policyManager.isOrganizationOwnedDeviceWithManagedProfile } catch (_: Exception) { null }
     } else null
 
     val managementSummary = when {
-        deviceManaged == true && organizationOwnedProfile == true ->
-            "Android reports device management and an organisation-owned managed profile"
-        deviceManaged == true ->
-            "Android reports that this device is managed"
+        deviceManaged && organizationOwnedProfile == true ->
+            "Android reports a device-owner component and an organisation-owned managed profile"
+        deviceManaged ->
+            "Android reports a device-owner component: " + deviceOwnerComponent?.flattenToShortString()
         organizationOwnedProfile == true ->
             "Android reports an organisation-owned device with a managed profile"
-        deviceManaged == false && organizationOwnedProfile == false ->
-            "These Android management APIs did not report device-wide management"
         else ->
-            "Device-wide management status is not fully available through these APIs"
+            "No device-owner component was returned by the public API; this does not rule out profile, OEM, finance-provider, or server-side management"
     }
 
     val restrictionLabels = listOf(
