@@ -277,6 +277,11 @@ private fun reportText(context: Context, checks: List<Check>, userObservation: S
         appendLine(it.detail)
         appendLine()
     }
+    appendLine("PAYMENT DEADLINE INVESTIGATION")
+    appendLine("Working hypothesis: the user reports that a previous lock occurred immediately after the payment became overdue. This is a user-reported sequence, not independently verified. The app cannot read the PayJoy account deadline, overdue status, server decision, command history, or local enforcement timer.")
+    appendLine("Evidence to record: exact SMS wording and timestamp; payment deadline shown by PayJoy; time any overdue status is displayed; time a restriction first appears. Remove personal and financial identifiers before sharing evidence.")
+    appendLine("Safety: do not disable administrator permissions or management services, reset the device to evade restrictions, or interfere with PayJoy/Knox components.")
+    appendLine()
     appendLine("USER-REPORTED LOCK OBSERVATION (NOT VERIFIED)")
     appendLine(if (userObservation.isBlank()) "No observation entered." else userObservation.trim())
     appendLine("This section records the user's description only. It does not verify PayJoy account status, server commands, receipt of a command, or Knox enforcement state.")
@@ -373,6 +378,15 @@ private fun MdmDoctorScreen(activity: MainActivity) {
                         Text("PayJoy & financing indicators", style = MaterialTheme.typography.titleSmall)
                         Text(payJoyAssessment(checks), style = MaterialTheme.typography.bodySmall)
                         Text("For an authoritative account or lock-status check, contact PayJoy or the finance provider. Do not interpret an unavailable package or a negative indicator as proof that no financing control exists.", style = MaterialTheme.typography.bodySmall)
+                    }
+                }
+
+                ElevatedCard(Modifier.fillMaxWidth()) {
+                    Column(Modifier.padding(16.dp), verticalArrangement = Arrangement.spacedBy(7.dp)) {
+                        Text("Payment deadline investigation", style = MaterialTheme.typography.titleSmall)
+                        Text("Investigation hypothesis based on the user's account of a previous immediate lock: the payment becoming overdue may be followed quickly by PayJoy server-side enforcement. This app cannot verify the account deadline, overdue transition, server decision, command delivery, or local enforcement timer.", style = MaterialTheme.typography.bodySmall)
+                        Text("For a useful evidence trail, record the exact SMS wording and timestamp, the payment deadline shown by PayJoy, the time the account status changes (if shown), and the time any restriction first appears. Keep screenshots for PayJoy support, but hide phone numbers, account references, payment details, and other personal information before sharing.", style = MaterialTheme.typography.bodySmall)
+                        Text("Do not change administrator permissions, disable management components, reset the phone, or interfere with PayJoy/Knox services. Those actions will not establish the server-side trigger and may make recovery harder.", style = MaterialTheme.typography.bodySmall)
                     }
                 }
 
