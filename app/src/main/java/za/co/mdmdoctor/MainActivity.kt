@@ -53,8 +53,13 @@ private fun runChecks(context: Context): List<Check> {
 }
 
 private fun reportText(context: Context, checks: List<Check>): String = buildString {
+    val appVersion = try {
+        context.packageManager.getPackageInfo(context.packageName, 0).versionName ?: "Unknown"
+    } catch (_: Exception) {
+        "Unknown"
+    }
     appendLine("MDM DOCTOR - DEVICE DIAGNOSTIC REPORT")
-    appendLine("App version: ${BuildConfig.VERSION_NAME}")
+    appendLine("App version: $appVersion")
     appendLine("Generated: ${DateFormat.getDateTimeInstance().format(Date())}")
     appendLine()
     checks.forEach {
@@ -99,6 +104,14 @@ private fun MdmDoctorScreen(activity: MainActivity) {
                 Text("MDM DOCTOR", style = MaterialTheme.typography.headlineMedium)
                 Text("Android device diagnostics", style = MaterialTheme.typography.titleMedium, color = MaterialTheme.colorScheme.primary)
                 Text("Read-only inspection. No device-management settings are changed.", style = MaterialTheme.typography.bodyMedium)
+
+                ElevatedCard(Modifier.fillMaxWidth()) {
+                    Column(Modifier.padding(16.dp), verticalArrangement = Arrangement.spacedBy(6.dp)) {
+                        Text("Understanding your results", style = MaterialTheme.typography.titleSmall)
+                        Text("A listed administrator, accessibility service, or notification listener is an indicator to review in Android Settings. It does not by itself prove that an app controls or has locked your device.", style = MaterialTheme.typography.bodySmall)
+                        Text("An empty list is not proof that the device has no management, Knox, finance, or server-side restrictions.", style = MaterialTheme.typography.bodySmall)
+                    }
+                }
 
                 Button(onClick = { checks = runChecks(activity); lastRunAt = Date() }, modifier = Modifier.fillMaxWidth()) {
                     Text("Run diagnostics again")
