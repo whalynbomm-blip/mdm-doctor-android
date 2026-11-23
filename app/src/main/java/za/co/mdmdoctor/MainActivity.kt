@@ -6,6 +6,8 @@ import android.content.ClipboardManager
 import android.content.Context
 import android.content.Intent
 import android.os.Build
+import android.net.ConnectivityManager
+import android.net.NetworkCapabilities
 import android.os.UserManager
 import android.os.Bundle
 import android.widget.Toast
@@ -97,6 +99,40 @@ private fun managementChecks(context: Context): List<Check> {
     )
 }
 
+private fun payJoyAndNetworkChecks(context: Context): List<Check> {
+    val payJoyPackage = "com.payjoy"
+    val payJoyCheck = try {
+        val info = context.packageManager.getPackageInfo(payJoyPackage, 0)
+        val label = try { context.packageManager.getApplicationLabel(info.applicationInfo!!).toString() } catch (_: Exception) { payJoyPackage }
+        Check("PayJoy app package visibility", "A package matching " + payJoyPackage + " is installed and visible to Android",
+            "Visible app label: " + label + ". Package presence does not reveal account status, server commands, payment status, or whether a lock is active.")
+    } catch (_: Exception) {
+        Check("PayJoy app package visibility", "No installed app was visible under the exact package name " + payJoyPackage,
+            "This is a limited package-name check. PayJoy software may use a different package name, be integrated by an OEM, or be hidden from ordinary app visibility. This result does not prove PayJoy is absent.")
+    }
+    val networkCheck = try {
+        val manager = context.getSystemService(Context.CONNECTIVITY_SERVICE) as ConnectivityManager
+        val capabilities = manager.activeNetwork?.let { manager.getNetworkCapabilities(it) }
+        val connected = capabilities?.hasCapability(NetworkCapabilities.NET_CAPABILITY_INTERNET) == true
+        val validated = capabilities?.hasCapability(NetworkCapabilities.NET_CAPABILITY_VALIDATED) == true
+        val transport = when {
+            capabilities?.hasTransport(NetworkCapabilities.TRANSPORT_WIFI) == true -> "Wi-Fi"
+            capabilities?.hasTransport(NetworkCapabilities.TRANSPORT_CELLULAR) == true -> "Mobile data"
+            capabilities?.hasTransport(NetworkCapabilities.TRANSPORT_ETHERNET) == true -> "Ethernet"
+            connected -> "Other network"
+            else -> "No active network"
+        }
+        Check("Network connectivity", when {
+            validated -> transport + " connected; Android reports internet validation"
+            connected -> transport + " connected; internet validation not confirmed"
+            else -> "No validated internet connection detected"
+        }, "This checks the current network only. It cannot confirm that PayJoy servers were reached, that a device command was received, or that the financing account is current.")
+    } catch (_: Exception) {
+        Check("Network connectivity", "Could not read network status", "Android did not provide a readable network state to this app.")
+    }
+    return listOf(payJoyCheck, networkCheck)
+}
+
 private fun runChecks(context: Context): List<Check> {
     val accessibility = settingList(context, Settings.Secure.ENABLED_ACCESSIBILITY_SERVICES)
     val notificationListeners = settingList(context, "enabled_notification_listeners")
@@ -123,8 +159,8 @@ private fun runChecks(context: Context): List<Check> {
             if (admins.any { it == "com.samsung.android.kgclient" }) "KG Client is listed as an active device administrator" else "KG Client was not listed among active device administrators",
             "Package visibility only. This does not confirm Knox Guard enrollment, a finance agreement, an active lock, or an enforced restriction."
         ),
-        Check("Knox / finance lock", "Not conclusively detectable", "Samsung Knox, finance-provider controls, and server-side lock policies may not be fully visible to an ordinary app. Contact the provider or device seller for authoritative release status.")
-    ) + managementChecks(context)
+        Check("Knox / finance lock", "Not conclusively detectable", "Samsung Knox Guard licensing state, finance-provider account status, server commands, and enforcement state are not exposed as a definitive status to an ordinary third-party app. Contact PayJoy or the finance partner for authoritative confirmation.")
+    ) + payJoyAndNetworkChecks(context) + managementChecks(context)
 }
 
 private const val HISTORY_PREFS = "diagnostic_history"
@@ -190,6 +226,12 @@ private fun componentFindings(context: Context): List<ComponentFinding> {
             context.packageManager.getApplicationLabel(info).toString()
         } catch (_: Exception) { packageName }
         val explanation = when (packageName) {
+            "com.sec.android.app.launcher" ->
+                "Recognised Samsung One UI Home launcher. It is a normal Samsung system component. Its appearance as a notification listener does not indicate finance management or a device lock."
+            "com.samsung.android.smartmirroring" ->
+                "Recognised Samsung Smart View component. It supports Samsung screen mirroring features. Its appearance as a notification listener does not indicate finance management or a device lock."
+            "za.co.driverprofit.indassistant" ->
+                "Recognised IND Assistant package. This is the accessibility service belonging to the IND Assistant app; its presence does not mean it is a finance-management component."
             "com.samsung.android.kgclient" ->
                 "Recognised Samsung KG Client package. Its appearance in this Android access list indicates that this component is enabled for the role shown. This alone does not prove a finance lock is active, identify the organisation managing the phone, or show that a restriction is being enforced."
             context.packageName ->
