@@ -69,6 +69,42 @@ private fun runChecks(context: Context): List<Check> {
     )
 }
 
+private const val HISTORY_PREFS = "diagnostic_history"
+private const val HISTORY_LIMIT = 10
+
+private fun loadHistory(context: Context): List<String> {
+    val prefs = context.getSharedPreferences(HISTORY_PREFS, Context.MODE_PRIVATE)
+    val count = prefs.getInt("count", 0).coerceIn(0, HISTORY_LIMIT)
+    return (0 until count).mapNotNull { prefs.getString("entry_$it", null) }
+}
+
+private fun saveHistory(context: Context, report: String): List<String> {
+    val entries = (listOf(report) + loadHistory(context)).take(HISTORY_LIMIT)
+    val editor = context.getSharedPreferences(HISTORY_PREFS, Context.MODE_PRIVATE).edit()
+        .putInt("count", entries.size)
+    entries.forEachIndexed { index, entry -> editor.putString("entry_$index", entry) }
+    editor.apply()
+    return entries
+}
+
+private fun clearHistory(context: Context) {
+    context.getSharedPreferences(HISTORY_PREFS, Context.MODE_PRIVATE).edit().clear().apply()
+}
+
+private fun assessmentText(checks: List<Check>): String {
+    val adminCount = checks.firstOrNull { it.name == "Active device-admin apps" }
+        ?.result?.substringBefore(' ')?.toIntOrNull() ?: 0
+    val accessibilityCount = checks.firstOrNull { it.name == "Enabled accessibility services" }
+        ?.result?.substringBefore(' ')?.toIntOrNull() ?: 0
+    val listenerCount = checks.firstOrNull { it.name == "Notification-listener access" }
+        ?.result?.substringBefore(' ')?.toIntOrNull() ?: 0
+    return if (adminCount + accessibilityCount + listenerCount > 0) {
+        "Some administrator or special-access services are enabled. Review each listed app in Android Settings and confirm that you recognise it. These counts are not a threat score and do not prove that an app has locked or controls the device."
+    } else {
+        "Android did not report active administrators or enabled special-access services in the settings this app can read. This does not rule out other management, Knox, finance-provider, or server-side controls."
+    }
+}
+
 private fun reportText(context: Context, checks: List<Check>): String = buildString {
     val appVersion = try {
         context.packageManager.getPackageInfo(context.packageName, 0).versionName ?: "Unknown"
@@ -100,6 +136,8 @@ class MainActivity : ComponentActivity() {
 private fun MdmDoctorScreen(activity: MainActivity) {
     var checks by remember { mutableStateOf(runChecks(activity)) }
     var lastRunAt by remember { mutableStateOf(Date()) }
+    var history by remember { mutableStateOf(loadHistory(activity)) }
+    var showHistory by remember { mutableStateOf(false) }
     var packageName by remember { mutableStateOf("com.payjoy") }
 
     fun openSettings(action: String, data: String? = null) {
@@ -130,7 +168,19 @@ private fun MdmDoctorScreen(activity: MainActivity) {
                     }
                 }
 
-                Button(onClick = { checks = runChecks(activity); lastRunAt = Date() }, modifier = Modifier.fillMaxWidth()) {
+                ElevatedCard(Modifier.fillMaxWidth()) {
+                    Column(Modifier.padding(16.dp), verticalArrangement = Arrangement.spacedBy(6.dp)) {
+                        Text("Diagnostic assessment", style = MaterialTheme.typography.titleSmall)
+                        Text(assessmentText(checks), style = MaterialTheme.typography.bodySmall)
+                        Text("This explains visible settings only; it is not a security rating or finance-lock detector.", style = MaterialTheme.typography.bodySmall)
+                    }
+                }
+
+                Button(onClick = {
+                    checks = runChecks(activity)
+                    lastRunAt = Date()
+                    history = saveHistory(activity, reportText(activity, checks))
+                }, modifier = Modifier.fillMaxWidth()) {
                     Text("Run diagnostics again")
                 }
                 OutlinedButton(
@@ -152,6 +202,33 @@ private fun MdmDoctorScreen(activity: MainActivity) {
                     },
                     modifier = Modifier.fillMaxWidth()
                 ) { Text("Share diagnostic report") }
+
+                OutlinedButton(
+                    onClick = { showHistory = !showHistory; history = loadHistory(activity) },
+                    modifier = Modifier.fillMaxWidth()
+                ) { Text(if (showHistory) "Hide diagnostic history" else "View diagnostic history (" + history.size + ")") }
+
+                if (showHistory) {
+                    ElevatedCard(Modifier.fillMaxWidth()) {
+                        Column(Modifier.padding(16.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
+                            Text("Saved on this device", style = MaterialTheme.typography.titleSmall)
+                            Text("The latest 10 reports are kept locally on this device. They are not uploaded.", style = MaterialTheme.typography.bodySmall)
+                            if (history.isEmpty()) {
+                                Text("No saved reports yet. Run diagnostics to save the first report.", style = MaterialTheme.typography.bodySmall)
+                            } else {
+                                history.forEachIndexed { index, entry ->
+                                    Text("Report " + (index + 1), style = MaterialTheme.typography.labelLarge)
+                                    Text(entry, style = MaterialTheme.typography.bodySmall)
+                                    if (index < history.lastIndex) HorizontalDivider()
+                                }
+                                TextButton(onClick = {
+                                    clearHistory(activity)
+                                    history = emptyList()
+                                }) { Text("Clear saved history") }
+                            }
+                        }
+                    }
+                }
 
                 checks.forEach { item ->
                     ElevatedCard(Modifier.fillMaxWidth()) {
