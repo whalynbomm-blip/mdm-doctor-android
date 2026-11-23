@@ -10,10 +10,15 @@ A local-first Android device diagnostics app. It reports Android-visible device 
 - Reports Android's public device-management status signals where supported.
 - Checks a limited, clearly documented set of user restrictions visible to the app.
 - Separately reports whether Samsung KG Client is visible among active device administrators, without treating that as proof of an active finance lock.
+- Dedicated PayJoy and financing-indicators summary combining visible PayJoy package information, Samsung KG Client visibility, current network state, and Android-visible restrictions.
+- Explicitly separates device-side observations from private PayJoy server, payment-account, remote-command, and Knox Guard enforcement states that an ordinary app cannot verify.
 - Clear limitation notice for Knox, finance-provider, and server-side policies that ordinary apps cannot conclusively inspect.
 - Re-run diagnostics and see the last-check time.
 - Copy a plain-text diagnostic report to the clipboard or share it using Android's chooser.
 - Open Android device-admin, accessibility, usage-access, overlay-permission, and app-information settings.
+
+## PayJoy and financing diagnostics
+The PayJoy summary groups independently observable indicators. The app checks only the exact `com.payjoy` package name currently declared in its package-visibility query; a different package name or OEM integration may not be visible. Network connectivity does not prove that PayJoy servers were contacted or that a lock/unlock command was received. Account status and authoritative lock state must be confirmed with PayJoy or the finance provider.
 
 ## Diagnostic interpretation
 - Android management signals and user restrictions are observations, not a complete inventory of all policies.
