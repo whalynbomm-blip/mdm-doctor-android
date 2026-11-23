@@ -133,6 +133,24 @@ private fun payJoyAndNetworkChecks(context: Context): List<Check> {
     return listOf(payJoyCheck, networkCheck)
 }
 
+
+private fun payJoyAssessment(checks: List<Check>): String {
+    fun result(name: String) = checks.firstOrNull { it.name == name }?.result ?: "Not available"
+    val packageResult = result("PayJoy app package visibility")
+    val kgResult = result("Samsung KG Client visibility")
+    val networkResult = result("Network connectivity")
+    val restrictionResult = result("Observable user restrictions")
+
+    return buildString {
+        appendLine("PayJoy app: $packageResult")
+        appendLine("Samsung KG Client: $kgResult")
+        appendLine("Network: $networkResult")
+        appendLine("Android restrictions: $restrictionResult")
+        appendLine()
+        append("Interpretation: these are separate, limited observations. A visible PayJoy package, KG Client component, internet connection, or Android restriction does not independently prove that PayJoy has sent a lock command or that a finance lock is active. This app cannot query PayJoy's private servers, payment account, command history, or Knox Guard enforcement state.")
+    }
+}
+
 private fun runChecks(context: Context): List<Check> {
     val accessibility = settingList(context, Settings.Secure.ENABLED_ACCESSIBILITY_SERVICES)
     val notificationListeners = settingList(context, "enabled_notification_listeners")
@@ -342,6 +360,14 @@ private fun MdmDoctorScreen(activity: MainActivity) {
                         Text("Diagnostic assessment", style = MaterialTheme.typography.titleSmall)
                         Text(assessmentText(checks), style = MaterialTheme.typography.bodySmall)
                         Text("This explains visible settings only; it is not a security rating or finance-lock detector.", style = MaterialTheme.typography.bodySmall)
+                    }
+                }
+
+                ElevatedCard(Modifier.fillMaxWidth()) {
+                    Column(Modifier.padding(16.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
+                        Text("PayJoy & financing indicators", style = MaterialTheme.typography.titleSmall)
+                        Text(payJoyAssessment(checks), style = MaterialTheme.typography.bodySmall)
+                        Text("For an authoritative account or lock-status check, contact PayJoy or the finance provider. Do not interpret an unavailable package or a negative indicator as proof that no financing control exists.", style = MaterialTheme.typography.bodySmall)
                     }
                 }
 
