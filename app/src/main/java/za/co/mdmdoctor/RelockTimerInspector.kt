@@ -103,7 +103,7 @@ fun RelockTimerInspectorCard(context: Context) {
             OutlinedButton(
                 onClick = {
                     try {
-                        context.startActivity(android.content.Intent(android.provider.Settings.ACTION_DEVICE_ADMIN_SETTINGS).addFlags(android.content.Intent.FLAG_ACTIVITY_NEW_TASK))
+                        context.startActivity(android.content.Intent(android.provider.Settings.ACTION_SETTINGS).addFlags(android.content.Intent.FLAG_ACTIVITY_NEW_TASK))
                     } catch (_: Exception) { }
                 },
                 modifier = Modifier.fillMaxWidth()
