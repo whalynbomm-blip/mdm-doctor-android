@@ -261,7 +261,7 @@ private fun componentFindings(context: Context): List<ComponentFinding> {
     }
 }
 
-private fun reportText(context: Context, checks: List<Check>): String = buildString {
+private fun reportText(context: Context, checks: List<Check>, userObservation: String = ""): String = buildString {
     val appVersion = try {
         context.packageManager.getPackageInfo(context.packageName, 0).versionName ?: "Unknown"
     } catch (_: Exception) {
@@ -277,6 +277,10 @@ private fun reportText(context: Context, checks: List<Check>): String = buildStr
         appendLine(it.detail)
         appendLine()
     }
+    appendLine("USER-REPORTED LOCK OBSERVATION (NOT VERIFIED)")
+    appendLine(if (userObservation.isBlank()) "No observation entered." else userObservation.trim())
+    appendLine("This section records the user's description only. It does not verify PayJoy account status, server commands, receipt of a command, or Knox enforcement state.")
+    appendLine()
     appendLine("VISIBLE COMPONENT REVIEW")
     val findings = componentFindings(context)
     if (findings.isEmpty()) {
@@ -306,12 +310,13 @@ private fun MdmDoctorScreen(activity: MainActivity) {
     var history by remember { mutableStateOf(loadHistory(activity)) }
     var showHistory by remember { mutableStateOf(false) }
     var exportStatus by remember { mutableStateOf("") }
+    var userObservation by remember { mutableStateOf("") }
     val exportReport = rememberLauncherForActivityResult(ActivityResultContracts.CreateDocument("text/plain")) { uri ->
         if (uri == null) {
             exportStatus = "Export cancelled."
         } else {
             try {
-                val report = reportText(activity, checks)
+                val report = reportText(activity, checks, userObservation)
                 val output = activity.contentResolver.openOutputStream(uri)
                 if (output == null) {
                     exportStatus = "Could not open the selected destination."
@@ -371,6 +376,22 @@ private fun MdmDoctorScreen(activity: MainActivity) {
                     }
                 }
 
+                ElevatedCard(Modifier.fillMaxWidth()) {
+                    Column(Modifier.padding(16.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
+                        Text("PayJoy lock-lifecycle observation", style = MaterialTheme.typography.titleSmall)
+                        Text("Describe what you actually see when the phone is restricted. Include the exact on-screen wording if possible, and whether normal calls, settings, and mobile data still work. Do not enter passwords, PINs, one-time codes, account numbers, or personal financial details.", style = MaterialTheme.typography.bodySmall)
+                        OutlinedTextField(
+                            value = userObservation,
+                            onValueChange = { userObservation = it },
+                            label = { Text("Phone behaviour and exact lock-screen message") },
+                            modifier = Modifier.fillMaxWidth(),
+                            minLines = 3,
+                            maxLines = 6
+                        )
+                        Text("Your description is saved only when you save, export, copy, or share a diagnostic report. It is not independently verified.", style = MaterialTheme.typography.bodySmall)
+                    }
+                }
+
                 val componentNotes = componentFindings(activity)
                 ElevatedCard(Modifier.fillMaxWidth()) {
                     Column(Modifier.padding(16.dp), verticalArrangement = Arrangement.spacedBy(10.dp)) {
@@ -398,14 +419,14 @@ private fun MdmDoctorScreen(activity: MainActivity) {
                 Button(onClick = {
                     checks = runChecks(activity)
                     lastRunAt = Date()
-                    history = saveHistory(activity, reportText(activity, checks))
+                    history = saveHistory(activity, reportText(activity, checks, userObservation))
                 }, modifier = Modifier.fillMaxWidth()) {
                     Text("Run diagnostics again")
                 }
                 OutlinedButton(
                     onClick = {
                         val clipboard = activity.getSystemService(Context.CLIPBOARD_SERVICE) as ClipboardManager
-                        clipboard.setPrimaryClip(ClipData.newPlainText("MDM Doctor diagnostic report", reportText(activity, checks)))
+                        clipboard.setPrimaryClip(ClipData.newPlainText("MDM Doctor diagnostic report", reportText(activity, checks, userObservation)))
                         Toast.makeText(activity, "Diagnostic report copied", Toast.LENGTH_SHORT).show()
                     },
                     modifier = Modifier.fillMaxWidth()
@@ -422,7 +443,7 @@ private fun MdmDoctorScreen(activity: MainActivity) {
                         val send = Intent(Intent.ACTION_SEND).apply {
                             type = "text/plain"
                             putExtra(Intent.EXTRA_SUBJECT, "MDM Doctor diagnostic report")
-                            putExtra(Intent.EXTRA_TEXT, reportText(activity, checks))
+                            putExtra(Intent.EXTRA_TEXT, reportText(activity, checks, userObservation))
                         }
                         activity.startActivity(Intent.createChooser(send, "Share diagnostic report"))
                     },
