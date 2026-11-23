@@ -23,9 +23,12 @@ import java.util.Date
 
 data class Check(val name: String, val result: String, val detail: String)
 
-private fun settingList(context: Context, key: String): List<String> =
+private fun settingList(context: Context, key: String): List<String> = try {
     Settings.Secure.getString(context.contentResolver, key).orEmpty()
-        .split(':').filter { it.isNotBlank() }
+        .split(':').filter { it.isNotBlank() }.distinct()
+} catch (_: Exception) {
+    emptyList()
+}
 
 private fun runChecks(context: Context): List<Check> {
     val accessibility = settingList(context, Settings.Secure.ENABLED_ACCESSIBILITY_SERVICES)
