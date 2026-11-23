@@ -59,6 +59,7 @@ private fun reportText(context: Context, checks: List<Check>): String = buildStr
         appendLine(it.detail)
         appendLine()
     }
+    appendLine("Privacy: no report is uploaded automatically. Sharing happens only after the user chooses Share and selects a destination.")
     appendLine("This report is informational. It does not prove that a device is free of management or finance restrictions.")
 }
 
@@ -151,6 +152,7 @@ private fun MdmDoctorScreen(activity: MainActivity) {
                     modifier = Modifier.fillMaxWidth()
                 ) { Text("Open app info") }
                 Text("If the package name is unknown, find the app under Android Settings > Apps. Opening its information page does not change its permissions or management status.", style = MaterialTheme.typography.bodySmall)
+                Text("Privacy: MDM Doctor does not upload diagnostic reports. You choose if and where to share them.", style = MaterialTheme.typography.bodySmall)
                 Text("MDM Doctor is an information tool, not an unlock or removal tool.", style = MaterialTheme.typography.labelSmall)
                 Text("Generated: ${DateFormat.getDateTimeInstance().format(Date())}", style = MaterialTheme.typography.labelSmall)
             }
