@@ -6,6 +6,7 @@ import android.content.ClipboardManager
 import android.content.Context
 import android.content.Intent
 import android.os.Build
+import android.os.UserManager
 import android.os.Bundle
 import android.widget.Toast
 import android.provider.Settings
@@ -46,6 +47,68 @@ private fun readableComponent(context: Context, component: String): String {
 private fun readableComponents(context: Context, components: List<String>): List<String> =
     components.distinct().map { readableComponent(context, it) }
 
+private fun managementChecks(context: Context): List<Check> {
+    val policyManager = context.getSystemService(Context.DEVICE_POLICY_SERVICE) as DevicePolicyManager
+    val userManager = context.getSystemService(Context.USER_SERVICE) as UserManager
+
+    val deviceManaged = if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.S) {
+        try { policyManager.isDeviceManaged } catch (_: Exception) { null }
+    } else null
+    val organizationOwnedProfile = if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.R) {
+        try { policyManager.isOrganizationOwnedDeviceWithManagedProfile } catch (_: Exception) { null }
+    } else null
+
+    val managementSummary = when {
+        deviceManaged == true && organizationOwnedProfile == true ->
+            "Android reports device management and an organisation-owned managed profile"
+        deviceManaged == true ->
+            "Android reports that this device is managed"
+        organizationOwnedProfile == true ->
+            "Android reports an organisation-owned device with a managed profile"
+        deviceManaged == false && organizationOwnedProfile == false ->
+            "These Android management APIs did not report device-wide management"
+        else ->
+            "Device-wide management status is not fully available through these APIs"
+    }
+
+    val restrictionLabels = listOf(
+        "no_factory_reset" to "Factory reset restricted",
+        "no_add_user" to "Adding users restricted",
+        "no_install_apps" to "App installation restricted",
+        "no_uninstall_apps" to "App uninstallation restricted",
+        "no_config_wifi" to "Wi-Fi configuration restricted",
+        "no_usb_file_transfer" to "USB file transfer restricted",
+        "no_safe_boot" to "Safe boot restricted",
+        "no_debugging_features" to "Developer debugging restricted",
+        "no_modify_accounts" to "Account modification restricted"
+    )
+    val activeRestrictions = restrictionLabels.mapNotNull { (key, label) ->
+        try {
+            if (userManager.hasUserRestriction(key)) label else null
+        } catch (_: Exception) {
+            null
+        }
+    }
+    val restrictionResult = if (activeRestrictions.isEmpty()) {
+        "No checked restrictions reported for this user"
+    } else {
+        activeRestrictions.joinToString("; ")
+    }
+
+    return listOf(
+        Check(
+            "Android management signals",
+            managementSummary,
+            "Uses Android's public device-management status APIs where available. This is not a Knox Guard or finance-lock status check."
+        ),
+        Check(
+            "Observable user restrictions",
+            restrictionResult,
+            "Checks a limited set of restrictions visible to this app for the current Android user. Other policies, other users, OEM controls, and server-side rules may not be visible."
+        )
+    )
+}
+
 private fun runChecks(context: Context): List<Check> {
     val accessibility = settingList(context, Settings.Secure.ENABLED_ACCESSIBILITY_SERVICES)
     val notificationListeners = settingList(context, "enabled_notification_listeners")
@@ -67,8 +130,13 @@ private fun runChecks(context: Context): List<Check> {
         Check("Enabled accessibility services", "${accessibility.size} reported", if (accessibility.isEmpty()) "No enabled services were listed in Android's secure settings." else readableComponents(context, accessibility).joinToString("\n")),
         Check("Notification-listener access", "${notificationListeners.size} reported", if (notificationListeners.isEmpty()) "No enabled notification listeners were listed." else readableComponents(context, notificationListeners).joinToString("\n")),
         Check("MDM Doctor management role", ownManagementRole, "This checks only MDM Doctor's own registration status. It does not identify every other management agent or finance policy."),
+        Check(
+            "Samsung KG Client visibility",
+            if (admins.any { it == "com.samsung.android.kgclient" }) "KG Client is listed as an active device administrator" else "KG Client was not listed among active device administrators",
+            "Package visibility only. This does not confirm Knox Guard enrollment, a finance agreement, an active lock, or an enforced restriction."
+        ),
         Check("Knox / finance lock", "Not conclusively detectable", "Samsung Knox, finance-provider controls, and server-side lock policies may not be fully visible to an ordinary app. Contact the provider or device seller for authoritative release status.")
-    )
+    ) + managementChecks(context)
 }
 
 private const val HISTORY_PREFS = "diagnostic_history"
