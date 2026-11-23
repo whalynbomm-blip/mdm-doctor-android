@@ -107,17 +107,41 @@ private fun assessmentText(checks: List<Check>): String {
     }
 }
 
-private fun componentGuidance(context: Context): List<Pair<String, String>> {
+data class ComponentFinding(
+    val role: String,
+    val component: String,
+    val packageName: String,
+    val appLabel: String,
+    val explanation: String
+)
+
+private fun componentFindings(context: Context): List<ComponentFinding> {
     val policyManager = context.getSystemService(Context.DEVICE_POLICY_SERVICE) as DevicePolicyManager
-    val adminPackages = try { policyManager.activeAdmins.orEmpty().map { it.packageName } } catch (_: Exception) { emptyList() }
-    val accessibilityPackages = settingList(context, Settings.Secure.ENABLED_ACCESSIBILITY_SERVICES).map { it.substringBefore('/') }
-    val listenerPackages = settingList(context, "enabled_notification_listeners").map { it.substringBefore('/') }
-    val detected = (adminPackages + accessibilityPackages + listenerPackages).distinct()
-    return detected.mapNotNull { packageName ->
-        when (packageName) {
-            "com.samsung.android.kgclient" -> packageName to "Samsung KG Client component. Its presence can indicate a Samsung device-management component is active in an Android role listed above. It does not prove that a finance lock is active, identify who enrolled the device, or show whether a restriction is currently being enforced."
-            else -> null
+    val admins = try {
+        policyManager.activeAdmins.orEmpty().map { it.flattenToString() }
+    } catch (_: Exception) { emptyList() }
+    val accessibility = settingList(context, Settings.Secure.ENABLED_ACCESSIBILITY_SERVICES)
+    val listeners = settingList(context, "enabled_notification_listeners")
+    val entries = buildList {
+        admins.forEach { add("Device administrator" to it) }
+        accessibility.forEach { add("Accessibility service" to it) }
+        listeners.forEach { add("Notification listener" to it) }
+    }.distinct()
+    return entries.map { (role, component) ->
+        val packageName = component.substringBefore('/')
+        val appLabel = try {
+            val info = context.packageManager.getApplicationInfo(packageName, 0)
+            context.packageManager.getApplicationLabel(info).toString()
+        } catch (_: Exception) { packageName }
+        val explanation = when (packageName) {
+            "com.samsung.android.kgclient" ->
+                "Recognised Samsung KG Client package. Its appearance in this Android access list indicates that this component is enabled for the role shown. This alone does not prove a finance lock is active, identify the organisation managing the phone, or show that a restriction is being enforced."
+            context.packageName ->
+                "This is MDM Doctor itself. Its presence here reflects the role shown; it does not mean the app can remove or change another administrator."
+            else ->
+                "No built-in identification is available for this exact package. An unfamiliar name is not automatically malicious or a finance-management app. Check the app's publisher and purpose with the device owner or your organisation before making changes."
         }
+        ComponentFinding(role, component, packageName, appLabel, explanation)
     }
 }
 
@@ -137,6 +161,17 @@ private fun reportText(context: Context, checks: List<Check>): String = buildStr
         appendLine(it.detail)
         appendLine()
     }
+    appendLine("VISIBLE COMPONENT REVIEW")
+    val findings = componentFindings(context)
+    if (findings.isEmpty()) {
+        appendLine("No active administrator, enabled accessibility service, or notification listener was returned by the settings this app can read.")
+    } else {
+        findings.forEach { finding ->
+            appendLine("${finding.role}: ${finding.appLabel} (${finding.packageName})")
+            appendLine(finding.explanation)
+        }
+    }
+    appendLine()
     appendLine("Privacy: no report is uploaded automatically. Sharing happens only after the user chooses Share and selects a destination.")
     appendLine("This report is informational. It does not prove that a device is free of management or finance restrictions.")
 }
@@ -212,19 +247,27 @@ private fun MdmDoctorScreen(activity: MainActivity) {
                     }
                 }
 
-                val componentNotes = componentGuidance(activity)
+                val componentNotes = componentFindings(activity)
                 ElevatedCard(Modifier.fillMaxWidth()) {
-                    Column(Modifier.padding(16.dp), verticalArrangement = Arrangement.spacedBy(6.dp)) {
-                        Text("Component identification guide", style = MaterialTheme.typography.titleSmall)
+                    Column(Modifier.padding(16.dp), verticalArrangement = Arrangement.spacedBy(10.dp)) {
+                        Text("Detected component review", style = MaterialTheme.typography.titleSmall)
+                        Text("These entries are grouped by the Android role in which they were found. Review them with the app information page; the app does not change their permissions.", style = MaterialTheme.typography.bodySmall)
                         if (componentNotes.isEmpty()) {
-                            Text("No components with a built-in explanation were recognised in the visible administrator, accessibility, or notification-listener lists. Other components may still be present; this guide is not a complete inventory.", style = MaterialTheme.typography.bodySmall)
+                            Text("No active administrators, enabled accessibility services, or notification listeners were returned by the settings this app can read.", style = MaterialTheme.typography.bodySmall)
                         } else {
-                            componentNotes.forEach { (packageName, explanation) ->
-                                Text(packageName, style = MaterialTheme.typography.labelLarge)
-                                Text(explanation, style = MaterialTheme.typography.bodySmall)
+                            componentNotes.forEach { finding ->
+                                HorizontalDivider()
+                                Text(finding.appLabel, style = MaterialTheme.typography.titleSmall)
+                                Text(finding.role, style = MaterialTheme.typography.labelMedium, color = MaterialTheme.colorScheme.primary)
+                                Text("Package: " + finding.packageName, style = MaterialTheme.typography.bodySmall)
+                                Text(finding.explanation, style = MaterialTheme.typography.bodySmall)
+                                OutlinedButton(
+                                    onClick = { openSettings(Settings.ACTION_APPLICATION_DETAILS_SETTINGS, "package:${finding.packageName}") },
+                                    modifier = Modifier.fillMaxWidth()
+                                ) { Text("Open app information") }
                             }
                         }
-                        Text("Only exact package identifiers with a cautious, built-in explanation are shown. An unrecognised package is not automatically harmful.", style = MaterialTheme.typography.bodySmall)
+                        Text("A recognised component or an unknown component is not, by itself, proof of a threat, finance lock, or active restriction.", style = MaterialTheme.typography.bodySmall)
                     }
                 }
 
