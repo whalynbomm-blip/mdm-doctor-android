@@ -30,6 +30,20 @@ private fun settingList(context: Context, key: String): List<String> = try {
     emptyList()
 }
 
+private fun readableComponent(context: Context, component: String): String {
+    val packageName = component.substringBefore('/')
+    val label = try {
+        val app = context.packageManager.getApplicationInfo(packageName, 0)
+        context.packageManager.getApplicationLabel(app).toString()
+    } catch (_: Exception) {
+        packageName
+    }
+    return if (label == packageName) component else "$label ($component)"
+}
+
+private fun readableComponents(context: Context, components: List<String>): List<String> =
+    components.distinct().map { readableComponent(context, it) }
+
 private fun runChecks(context: Context): List<Check> {
     val accessibility = settingList(context, Settings.Secure.ENABLED_ACCESSIBILITY_SERVICES)
     val notificationListeners = settingList(context, "enabled_notification_listeners")
@@ -47,9 +61,9 @@ private fun runChecks(context: Context): List<Check> {
         Check("Device", "${Build.MANUFACTURER} ${Build.MODEL}", "Manufacturer and model reported by Android."),
         Check("Android version", "Android ${Build.VERSION.RELEASE} (API ${Build.VERSION.SDK_INT})", "Build: ${Build.DISPLAY}"),
         Check("Security patch", Build.VERSION.SECURITY_PATCH, "Patch level reported by Android; this does not confirm that every update is installed."),
-        Check("Active device-admin apps", "${admins.distinct().size} reported", if (admins.isEmpty()) "Android did not return any active device-admin components to this app." else admins.distinct().joinToString("\n")),
-        Check("Enabled accessibility services", "${accessibility.size} reported", if (accessibility.isEmpty()) "No enabled services were listed in Android's secure settings." else accessibility.joinToString("\n")),
-        Check("Notification-listener access", "${notificationListeners.size} reported", if (notificationListeners.isEmpty()) "No enabled notification listeners were listed." else notificationListeners.joinToString("\n")),
+        Check("Active device-admin apps", "${admins.distinct().size} reported", if (admins.isEmpty()) "Android did not return any active device-admin components to this app." else readableComponents(context, admins).joinToString("\n")),
+        Check("Enabled accessibility services", "${accessibility.size} reported", if (accessibility.isEmpty()) "No enabled services were listed in Android's secure settings." else readableComponents(context, accessibility).joinToString("\n")),
+        Check("Notification-listener access", "${notificationListeners.size} reported", if (notificationListeners.isEmpty()) "No enabled notification listeners were listed." else readableComponents(context, notificationListeners).joinToString("\n")),
         Check("MDM Doctor management role", ownManagementRole, "This checks only MDM Doctor's own registration status. It does not identify every other management agent or finance policy."),
         Check("Knox / finance lock", "Not conclusively detectable", "Samsung Knox, finance-provider controls, and server-side lock policies may not be fully visible to an ordinary app. Contact the provider or device seller for authoritative release status.")
     )
