@@ -11,6 +11,8 @@ import android.widget.Toast
 import android.provider.Settings
 import androidx.activity.ComponentActivity
 import androidx.activity.compose.setContent
+import androidx.activity.compose.rememberLauncherForActivityResult
+import androidx.activity.result.contract.ActivityResultContracts
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.verticalScroll
@@ -138,6 +140,26 @@ private fun MdmDoctorScreen(activity: MainActivity) {
     var lastRunAt by remember { mutableStateOf(Date()) }
     var history by remember { mutableStateOf(loadHistory(activity)) }
     var showHistory by remember { mutableStateOf(false) }
+    var exportStatus by remember { mutableStateOf("") }
+    val exportReport = rememberLauncherForActivityResult(ActivityResultContracts.CreateDocument("text/plain")) { uri ->
+        if (uri == null) {
+            exportStatus = "Export cancelled."
+        } else {
+            try {
+                val report = reportText(activity, checks)
+                val output = activity.contentResolver.openOutputStream(uri)
+                if (output == null) {
+                    exportStatus = "Could not open the selected destination."
+                } else {
+                    output.use { it.write(report.toByteArray(Charsets.UTF_8)) }
+                    exportStatus = "Report exported successfully."
+                    Toast.makeText(activity, "Diagnostic report saved", Toast.LENGTH_SHORT).show()
+                }
+            } catch (error: Exception) {
+                exportStatus = "Export failed: " + (error.message ?: "unknown error")
+            }
+        }
+    }
     var packageName by remember { mutableStateOf("com.payjoy") }
 
     fun openSettings(action: String, data: String? = null) {
@@ -191,6 +213,13 @@ private fun MdmDoctorScreen(activity: MainActivity) {
                     },
                     modifier = Modifier.fillMaxWidth()
                 ) { Text("Copy diagnostic report") }
+                OutlinedButton(
+                    onClick = { exportReport.launch("mdm-doctor-report.txt") },
+                    modifier = Modifier.fillMaxWidth()
+                ) { Text("Export report as text file") }
+                if (exportStatus.isNotBlank()) {
+                    Text(exportStatus, style = MaterialTheme.typography.bodySmall)
+                }
                 OutlinedButton(
                     onClick = {
                         val send = Intent(Intent.ACTION_SEND).apply {
