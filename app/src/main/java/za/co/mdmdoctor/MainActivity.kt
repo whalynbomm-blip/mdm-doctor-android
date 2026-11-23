@@ -355,6 +355,7 @@ private fun MdmDoctorScreen(activity: MainActivity) {
             ) {
                 Text("MDM DOCTOR", style = MaterialTheme.typography.headlineMedium)
                 Text("Android device diagnostics", style = MaterialTheme.typography.titleMedium, color = MaterialTheme.colorScheme.primary)
+                RelockTimerInspectorCard(activity)
                 Text("Read-only inspection. No device-management settings are changed.", style = MaterialTheme.typography.bodyMedium)
 
                 ElevatedCard(Modifier.fillMaxWidth()) {
