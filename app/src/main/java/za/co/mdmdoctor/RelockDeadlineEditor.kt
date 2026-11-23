@@ -1,6 +1,9 @@
 package za.co.mdmdoctor
 
 import android.content.Context
+import android.content.Intent
+import android.net.Uri
+import android.provider.Settings
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.fillMaxWidth
@@ -46,7 +49,7 @@ fun RelockDeadlineEditorCard() {
     var nowMillis by remember { mutableLongStateOf(System.currentTimeMillis()) }
     var message by remember { mutableStateOf("") }
 
-    LaunchedEffect(deadlineMillis) {
+    LaunchedEffect(Unit) {
         while (true) {
             nowMillis = System.currentTimeMillis()
             delay(1000L)
@@ -55,8 +58,8 @@ fun RelockDeadlineEditorCard() {
 
     val remaining = deadlineMillis?.minus(nowMillis)
     val countdown = when {
-        remaining == null -> "No personal deadline has been saved"
-        remaining <= 0L -> "The saved observation deadline has passed"
+        remaining == null -> "No deadline saved"
+        remaining <= 0L -> "The saved reference deadline has passed"
         else -> {
             val seconds = remaining / 1000L
             val days = seconds / 86400L
@@ -67,22 +70,41 @@ fun RelockDeadlineEditorCard() {
         }
     }
 
+    fun openPayJoy() {
+        try {
+            val launchIntent = context.packageManager.getLaunchIntentForPackage("com.payjoy")
+            if (launchIntent != null) {
+                launchIntent.addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
+                context.startActivity(launchIntent)
+                message = "PayJoy opened. Use its official payment or extension options to request a deadline change."
+            } else {
+                val details = Intent(Settings.ACTION_APPLICATION_DETAILS_SETTINGS)
+                    .setData(Uri.parse("package:com.payjoy"))
+                    .addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
+                context.startActivity(details)
+                message = "The PayJoy app launch screen was not found. Android opened its app-information page if that package is installed."
+            }
+        } catch (error: Exception) {
+            message = "Could not open PayJoy from Android: ${error.message ?: "app unavailable"}"
+        }
+    }
+
     Card(modifier = Modifier.fillMaxWidth()) {
         Column(
             modifier = Modifier.padding(16.dp),
             verticalArrangement = Arrangement.spacedBy(8.dp)
         ) {
-            Text("RELOCK DEADLINE EDITOR", style = MaterialTheme.typography.titleMedium)
+            Text("DEVICE RELOCK DEADLINE TRACKER", style = MaterialTheme.typography.titleMedium)
             Text(
-                "Set and edit a personal countdown deadline for tracking and reminders. This value is stored locally by MDM Doctor and is not a change to PayJoy, Knox Guard, the phone's enforced lock schedule, or a server-side payment deadline.",
+                "Enter the deadline currently shown or confirmed by your provider. MDM Doctor saves it as a reference and counts down locally. Android does not expose a public API for editing PayJoy or Knox Guard's protected enforcement timestamp, RPMB records, or TrustZone state.",
                 style = MaterialTheme.typography.bodySmall
             )
-            Text("Countdown", style = MaterialTheme.typography.titleSmall)
+            Text("Reference countdown", style = MaterialTheme.typography.titleSmall)
             Text(countdown, style = MaterialTheme.typography.headlineSmall)
             OutlinedTextField(
                 value = dateText,
                 onValueChange = { dateText = it },
-                label = { Text("Date (YYYY-MM-DD)") },
+                label = { Text("Provider deadline date (YYYY-MM-DD)") },
                 supportingText = { Text("Example: 2026-11-30") },
                 singleLine = true,
                 modifier = Modifier.fillMaxWidth()
@@ -90,7 +112,7 @@ fun RelockDeadlineEditorCard() {
             OutlinedTextField(
                 value = timeText,
                 onValueChange = { timeText = it },
-                label = { Text("Time (24-hour HH:mm)") },
+                label = { Text("Provider deadline time (24-hour HH:mm)") },
                 supportingText = { Text("Example: 20:00") },
                 singleLine = true,
                 modifier = Modifier.fillMaxWidth()
@@ -103,21 +125,36 @@ fun RelockDeadlineEditorCard() {
                         val millis = date.atTime(time).atZone(ZoneId.systemDefault()).toInstant().toEpochMilli()
                         prefs.edit().putLong(RELOCK_DEADLINE_KEY, millis).apply()
                         deadlineMillis = millis
-                        message = "Your personal countdown deadline has been saved."
+                        message = "Reference deadline saved on this phone. The PayJoy/Knox Guard enforcement deadline has not been changed."
                     } catch (_: Exception) {
                         message = "Enter a valid date as YYYY-MM-DD and time as HH:mm."
                     }
                 },
                 modifier = Modifier.fillMaxWidth()
-            ) { Text("Save / update my countdown") }
+            ) { Text("Save / update reference deadline") }
             OutlinedButton(
                 onClick = {
                     prefs.edit().remove(RELOCK_DEADLINE_KEY).apply()
                     deadlineMillis = null
-                    message = "Personal countdown cleared."
+                    message = "Saved reference deadline cleared."
                 },
                 modifier = Modifier.fillMaxWidth()
-            ) { Text("Clear personal countdown") }
+            ) { Text("Clear reference deadline") }
+
+            androidx.compose.material3.HorizontalDivider()
+            Text("Change the actual provider deadline", style = MaterialTheme.typography.titleSmall)
+            Text(
+                "An actual enforcement deadline can only be changed by PayJoy or the authorised Knox Guard administrator. This button opens the provider app when Android can find it; complete any approved extension or payment process there.",
+                style = MaterialTheme.typography.bodySmall
+            )
+            Button(onClick = { openPayJoy() }, modifier = Modifier.fillMaxWidth()) {
+                Text("Open PayJoy to request a deadline change")
+            }
+            Text(
+                "Device-side write access: NOT AVAILABLE through the public Android APIs used by this app. Editing the reference countdown does not unlock the phone or alter its security timer.",
+                style = MaterialTheme.typography.bodySmall,
+                color = MaterialTheme.colorScheme.error
+            )
             if (message.isNotBlank()) {
                 Text(message, style = MaterialTheme.typography.bodySmall)
             }
