@@ -7,10 +7,18 @@ A local-first Android device diagnostics app. It reports Android-visible device 
 - Active device-admin package list returned by Android.
 - Enabled accessibility services and notification-listener services reported by Android secure settings.
 - Checks whether MDM Doctor itself is registered as device owner or profile owner.
+- Reports Android's public device-management status signals where supported.
+- Checks a limited, clearly documented set of user restrictions visible to the app.
+- Separately reports whether Samsung KG Client is visible among active device administrators, without treating that as proof of an active finance lock.
 - Clear limitation notice for Knox, finance-provider, and server-side policies that ordinary apps cannot conclusively inspect.
 - Re-run diagnostics and see the last-check time.
 - Copy a plain-text diagnostic report to the clipboard or share it using Android's chooser.
 - Open Android device-admin, accessibility, usage-access, overlay-permission, and app-information settings.
+
+## Diagnostic interpretation
+- Android management signals and user restrictions are observations, not a complete inventory of all policies.
+- Samsung KG Client visibility does not confirm Knox Guard enrollment, finance status, lock enforcement, or the identity of a managing organisation.
+- A negative result does not prove that no OEM, Knox, finance-provider, or server-side restriction exists.
 
 ## Privacy
 - No diagnostic report is uploaded automatically.
